@@ -2,27 +2,51 @@
 
 This directory contains validation scripts to test WeChat data access before building the full skill.
 
-## Two Approaches
+## Platform-Specific Approaches
 
-### Approach 1: itchat (Web API) - `validate_auth.py`
+| Approach | Platform | Moments Access | Script |
+|----------|----------|----------------|--------|
+| itchat (Web API) | Any | No | `validate_auth.py` |
+| WeChatFerry | Windows | Yes | `validate_wcferry.py` |
+| Mac Local DB | macOS | Limited | `validate_mac.py` |
+| iPhone Backup | macOS | Yes | `validate_iphone_backup.py` |
 
-**Pros:**
-- Works on any platform (Linux, macOS, Windows)
-- Simple setup - just scan QR code
-- Good for contacts, messages, groups
+---
 
-**Cons:**
-- **Cannot access Moments (朋友圈)**
-- Web WeChat may be disabled for some accounts
-- Limited message history
+## macOS Users (Recommended Path)
 
-**Run:**
+Since WeChat Web is blocked for many accounts and WeChatFerry is Windows-only, macOS users should try:
+
+### Option 1: iPhone Backup Method (Best for Moments)
+
+If you have an iPhone with WeChat:
+
 ```bash
 cd /home/user/openclaw/skills/wechat/scripts
-uv run validate_auth.py
+uv run validate_iphone_backup.py --list-backups
 ```
 
-### Approach 2: WeChatFerry (Desktop Hook) - `validate_wcferry.py`
+**Setup Steps:**
+1. Connect iPhone to Mac via USB
+2. Open Finder → Select iPhone
+3. Under Backups, **uncheck** "Encrypt local backup"
+4. Click "Back Up Now"
+5. Run the validation script
+
+### Option 2: Mac Local Database
+
+Check if WeChat Mac has accessible data:
+
+```bash
+cd /home/user/openclaw/skills/wechat/scripts
+uv run validate_mac.py --find-db
+```
+
+---
+
+## Windows Users
+
+### WeChatFerry (Desktop Hook)
 
 **Pros:**
 - **CAN access Moments (朋友圈)**
@@ -30,7 +54,6 @@ uv run validate_auth.py
 - More features available
 
 **Cons:**
-- Windows only (macOS experimental)
 - Requires WeChat Desktop running
 - More complex setup
 - Higher TOS risk
@@ -41,85 +64,82 @@ cd /home/user/openclaw/skills/wechat/scripts
 uv run validate_wcferry.py --test-moments
 ```
 
-## Recommended Testing Order
+---
 
-1. **First, try itchat** (`validate_auth.py`):
-   - If you only need contacts/messages, this may be sufficient
-   - Simpler and more portable
+## All Platforms
 
-2. **If you need Moments**, try WeChatFerry (`validate_wcferry.py`):
-   - Requires Windows with WeChat Desktop
-   - More powerful but more complex
+### itchat (Web API)
 
-## Expected Results
+**Note:** Many accounts have Web WeChat disabled. Try this first to check.
 
-### validate_auth.py Output
-
-```
-WeChat Access Validation Script
-==================================================
-Test 1: Basic Account Info
---------------------------------------------------
-Logged in as: YourName
-WeChat ID: wxid_xxx...
-
-Test 2: Contacts Access
---------------------------------------------------
-Total contacts found: 150
-Sample contacts (first 5):
-  1. Friend A
-  2. Friend B
-  ...
-
-Test 5: Moments (朋友圈) Access
---------------------------------------------------
-IMPORTANT FINDING:
-The WeChat Web API does NOT support Moments access.
-...
+**Run:**
+```bash
+cd /home/user/openclaw/skills/wechat/scripts
+uv run validate_auth.py
 ```
 
-### validate_wcferry.py Output (if Moments needed)
+If you see "service unavailable for this account" after scanning QR code, your account has Web access disabled.
+
+---
+
+## Decision Matrix
 
 ```
-WeChatFerry Validation Script
-==================================================
-Platform: SUPPORTED
-WeChat Desktop: RUNNING
-Connection: SUCCESS
-
-Moments (朋友圈) Test
---------------------------------------------------
-Moments API: AVAILABLE
-...
+Do you need Moments access?
+│
+├─ NO → Try itchat (validate_auth.py)
+│       └─ If blocked → Use manual chat export
+│
+└─ YES → What's your platform?
+         │
+         ├─ Windows → Use WeChatFerry (validate_wcferry.py)
+         │
+         └─ macOS → Do you have iPhone?
+                    │
+                    ├─ YES → Use iPhone Backup (validate_iphone_backup.py)
+                    │
+                    └─ NO → Options:
+                            1. Screenshot + OCR approach
+                            2. Mac local DB (limited)
+                            3. WeChat Work API (if enterprise)
 ```
 
-## Next Steps After Validation
+---
 
-Once you confirm which approach works for your use case:
+## Alternative Approaches
 
-1. **If itchat works** and Moments not needed:
-   - Build skill using itchat backend
-   - Focus on contacts, messages, groups features
+If automated access doesn't work:
 
-2. **If WeChatFerry works** and Moments needed:
-   - Build skill with WeChatFerry backend
-   - Document Windows requirement
-   - Implement Moments parsing
+### Manual Chat Export
+- WeChat → Settings → General → Export Chat History
+- Skill parses exported HTML/text files
 
-3. **If neither works well**:
-   - Consider manual export workflow
-   - Or mobile automation (Appium) as last resort
+### Screenshot + Vision Model
+- Screenshot Moments feed on phone
+- Use vision model (GPT-4V, Claude) to extract and summarize
+- Quick and effective for occasional use
+
+### WeChat Work API
+- If you have enterprise WeChat Work account
+- Official API with proper access
+- Limited to work account data
+
+---
 
 ## Troubleshooting
 
-### itchat Issues
+### "Service unavailable for this account"
+Your account has WeChat Web disabled. This is common for:
+- Accounts created after ~2017
+- Accounts in mainland China
+- Accounts flagged for security
 
-- **QR code not showing**: Try `--light-terminal` flag or check terminal encoding
-- **Login fails immediately**: Your account may have Web WeChat disabled
-- **Session expires quickly**: This is a WeChat limitation; re-login needed
+**Solution:** Use platform-specific alternatives (iPhone backup, WeChatFerry)
 
-### WeChatFerry Issues
+### Encrypted iPhone Backup
+- Must use **unencrypted** backup for direct access
+- Finder → iPhone → Backups → Uncheck "Encrypt local backup"
 
-- **Connection failed**: Ensure WeChat Desktop is running and logged in
-- **DLL injection error**: May need to run as administrator
-- **Version mismatch**: Check wcferry package version matches your WeChat version
+### WeChat Desktop Not Found (Mac)
+- Install from Mac App Store or weixin.qq.com
+- Make sure you've logged in at least once
